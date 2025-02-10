@@ -1,80 +1,81 @@
 import streamlit as st
 import pandas as pd
+import os
+import glob
 from streamlit_option_menu import option_menu
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-import time
-import os  
-import glob
+import requests
+from bs4 import BeautifulSoup as bs
 
-def scrape_data_with_selenium(url):  
+# Function to get the Chrome WebDriver with headless configuration
+def get_driver():
+    options = Options()
+    options.add_argument('--headless')  # Run Chrome in headless mode
+    options.add_argument('--no-sandbox')  # Fix for some environments
+    options.add_argument('--disable-dev-shm-usage')  # Workaround for limited resources
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    return driver
+
+# Scraping function using Selenium
+def scrape_data(url):  
     try:
-        # Set up Selenium WebDriver (Chrome)
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")  # Run in headless mode
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        
+        driver = get_driver()  # Get the headless driver
         driver.get(url)
-        time.sleep(2)  # Wait for the page to load completely
         
-        containers = driver.find_elements(By.CLASS_NAME, 'listings-cards__list-item')
-        data = []  
+        soup = bs(driver.page_source, 'html.parser')
+        containers = soup.find_all('div', class_='listings-cards__list-item')  
+        data = []
 
-        for container in containers:  
+        for container in containers:
             try:
-                detail_elem = container.find_element(By.CLASS_NAME, 'listing-card__header__title')  
-                prix_elem = container.find_element(By.CLASS_NAME, 'listing-card__price__value')  
-                adresse_elem = container.find_element(By.CLASS_NAME, 'listing-card__header__location')  
-                image_elem = container.find_element(By.CLASS_NAME, 'listing-card__image__inner')  
+                detail_elem = container.find('div', class_='listing-card__header__title')
+                prix_elem = container.find('span', class_='listing-card__price__value')
+                adresse_elem = container.find('div', class_='listing-card__header__location')
+                image_elem = container.find('div', class_='listing-card__image__inner')
 
-                condition_classes = [  
-                    'listing-card__header__tags__item--condition_used',  
-                    'listing-card__header__tags__item--condition_new',  
-                    'listing-card__header__tags__item--condition_refurbished',  
-                    'listing-card__header__tags__item--condition_used-abroad'  
-                ]  
+                condition_classes = [
+                    'listing-card__header__tags__item--condition_used',
+                    'listing-card__header__tags__item--condition_new',
+                    'listing-card__header__tags__item--condition_refurbished',
+                    'listing-card__header__tags__item--condition_used-abroad'
+                ]
 
-                etat = "Pas Disponible"  
-                for cls in condition_classes:  
-                    try:
-                        etat_elem = container.find_element(By.CLASS_NAME, cls)
-                        if etat_elem:
-                            etat = etat_elem.text.strip()  
-                            break
-                    except:
-                        pass
-                
-                detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"  
-                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
-                adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"  
-                image_lien = image_elem.find_element(By.TAG_NAME, 'img').get_attribute('src') if image_elem else "Pas Disponible"  
+                etat = "Pas Disponible"
+                for cls in condition_classes:
+                    etat_elem = container.find('span', class_=cls)
+                    if etat_elem:
+                        etat = etat_elem.text.strip()
+                        break
 
-                dic = {  
-                    'Details': detail,  
-                    'Condition': etat,  
-                    'Price (F Cfa)': prix,  
-                    'Address': adresse,  
-                    'Image Link': image_lien  
-                }  
-                data.append(dic)  
+                detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"
+                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0
+                adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"
+                image_lien = image_elem.img['src'] if image_elem and image_elem.img else "Pas Disponible"
 
-            except Exception as inner_e:  
-                st.error(f"Error processing item: {inner_e}")  
+                dic = {
+                    'Details': detail,
+                    'Condition': etat,
+                    'Price (F Cfa)': prix,
+                    'Address': adresse,
+                    'Image Link': image_lien
+                }
+                data.append(dic)
 
-        driver.quit()  # Close the WebDriver
-        return pd.DataFrame(data)
-    
-    except Exception as e:
+            except Exception as inner_e:
+                st.error(f"Error processing item: {inner_e}")
+
+        driver.quit()  # Close the browser after scraping
+        return pd.DataFrame(data)  
+
+    except requests.RequestException as e:
         st.error(f"Request failed: {e}")
         return pd.DataFrame()
 
 # Sidebar configuration  
-st.sidebar.title("Expat Dakar")  
+st.sidebar.title("Expat Dakar")
 
 categories = {  
     "Refrigerateurs Congélateurs": "https://www.expat-dakar.com/refrigerateurs-congelateurs",  
@@ -100,7 +101,7 @@ if option_selection == "Scrape Data with Selenium":
     st.header("Scraping Results")  
     selected_url = f"{categories[url_selection]}?page={page_selection}"  
     with st.spinner('Scraping data...'):  
-        scraped_data = scrape_data_with_selenium(selected_url)  
+        scraped_data = scrape_data(selected_url)  
 
     if not scraped_data.empty:  
         st.write(scraped_data)  
