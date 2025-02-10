@@ -1,27 +1,21 @@
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.google.com/"
-}
-
-res = requests.get(url, headers=headers)
-
-
 import streamlit as st
 import pandas as pd
-
 from streamlit_option_menu import option_menu
-
-
 import requests  
 from bs4 import BeautifulSoup as bs  
-
 import os  
 import glob  
 
 def scrape_data(url):  
     try:  
-        res = requests.get(url)  
+        # Define headers to mimic a browser
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Referer": "https://www.google.com/"
+        }
+
+        res = requests.get(url, headers=headers)  # Add headers to the request
         res.raise_for_status()  
         soup = bs(res.text, 'html.parser')  
         
@@ -50,7 +44,7 @@ def scrape_data(url):
                         break  
                 
                 detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"  
-                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
+                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(',', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
                 adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"  
                 image_lien = image_elem.img['src'] if image_elem and image_elem.img else "Pas Disponible"  
 
@@ -155,6 +149,3 @@ elif option_selection == "App Evaluation":
     st.header("App Evaluation Form")  
     st.write("Please fill out the form below to provide feedback on the app:")  
     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
-
-
-
