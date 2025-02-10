@@ -9,3 +9,4 @@ seaborn
 pybase64
 openpyxl
 plotly
+streamlit_option_menu
