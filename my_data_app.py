@@ -1,33 +1,36 @@
 import streamlit as st
 import pandas as pd
 from streamlit_option_menu import option_menu
-import requests  
-from bs4 import BeautifulSoup as bs  
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 import os  
-import glob  
+import glob
 
-def scrape_data(url):  
-    try:  
-        # Define headers to mimic a browser
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Referer": "https://www.google.com/"
-        }
-
-        res = requests.get(url, headers=headers)  # Add headers to the request
-        res.raise_for_status()  
-        soup = bs(res.text, 'html.parser')  
+def scrape_data_with_selenium(url):  
+    try:
+        # Set up Selenium WebDriver (Chrome)
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")  # Run in headless mode
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
         
-        containers = soup.find_all('div', class_='listings-cards__list-item')  
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        
+        driver.get(url)
+        time.sleep(2)  # Wait for the page to load completely
+        
+        containers = driver.find_elements(By.CLASS_NAME, 'listings-cards__list-item')
         data = []  
 
         for container in containers:  
-            try:  
-                detail_elem = container.find('div', class_='listing-card__header__title')  
-                prix_elem = container.find('span', class_='listing-card__price__value')  
-                adresse_elem = container.find('div', class_='listing-card__header__location')  
-                image_elem = container.find('div', class_='listing-card__image__inner')  
+            try:
+                detail_elem = container.find_element(By.CLASS_NAME, 'listing-card__header__title')  
+                prix_elem = container.find_element(By.CLASS_NAME, 'listing-card__price__value')  
+                adresse_elem = container.find_element(By.CLASS_NAME, 'listing-card__header__location')  
+                image_elem = container.find_element(By.CLASS_NAME, 'listing-card__image__inner')  
 
                 condition_classes = [  
                     'listing-card__header__tags__item--condition_used',  
@@ -38,15 +41,18 @@ def scrape_data(url):
 
                 etat = "Pas Disponible"  
                 for cls in condition_classes:  
-                    etat_elem = container.find('span', class_=cls)  
-                    if etat_elem:  
-                        etat = etat_elem.text.strip()  
-                        break  
+                    try:
+                        etat_elem = container.find_element(By.CLASS_NAME, cls)
+                        if etat_elem:
+                            etat = etat_elem.text.strip()  
+                            break
+                    except:
+                        pass
                 
                 detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"  
-                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(',', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
+                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
                 adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"  
-                image_lien = image_elem.img['src'] if image_elem and image_elem.img else "Pas Disponible"  
+                image_lien = image_elem.find_element(By.TAG_NAME, 'img').get_attribute('src') if image_elem else "Pas Disponible"  
 
                 dic = {  
                     'Details': detail,  
@@ -60,11 +66,12 @@ def scrape_data(url):
             except Exception as inner_e:  
                 st.error(f"Error processing item: {inner_e}")  
 
-        return pd.DataFrame(data)  
+        driver.quit()  # Close the WebDriver
+        return pd.DataFrame(data)
     
-    except requests.RequestException as e:  
-        st.error(f"Request failed: {e}")  
-        return pd.DataFrame()  
+    except Exception as e:
+        st.error(f"Request failed: {e}")
+        return pd.DataFrame()
 
 # Sidebar configuration  
 st.sidebar.title("Expat Dakar")  
@@ -82,18 +89,18 @@ if url_selection:
     pages = range(1, 18)  
     page_selection = st.sidebar.selectbox("Choisissez le numero de la page :", pages)  
 
-options = ["Select...", "Scrape Data with Beautiful Soup", "Download Data", "Dashboard", "App Evaluation"]  
+options = ["Select...", "Scrape Data with Selenium", "Download Data", "Dashboard", "App Evaluation"]  
 option_selection = st.sidebar.selectbox("Option:", options)  
 
 csv_folder_path = r'data'  
 clean_dashboard_path = r'clean_dashboard'  
 
 # Processing selections  
-if option_selection == "Scrape Data with Beautiful Soup":  
+if option_selection == "Scrape Data with Selenium":  
     st.header("Scraping Results")  
     selected_url = f"{categories[url_selection]}?page={page_selection}"  
     with st.spinner('Scraping data...'):  
-        scraped_data = scrape_data(selected_url)  
+        scraped_data = scrape_data_with_selenium(selected_url)  
 
     if not scraped_data.empty:  
         st.write(scraped_data)  
