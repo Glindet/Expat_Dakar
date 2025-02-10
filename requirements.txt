@@ -1,0 +1,14 @@
+numpy
+bs4
+requests
+scipy
+matplotlib
+pandas
+streamlit
+seaborn
+pybase64
+
+py -3 -m venv env
+env\Scripts\activate
+pip install streamlit
+
