@@ -1,26 +1,20 @@
 import streamlit as st
 import pandas as pd
+
+from streamlit_option_menu import option_menu
+
+
+import requests  
+from bs4 import BeautifulSoup as bs  
+
 import os  
 import glob  
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.options import Options
-from bs4 import BeautifulSoup as bs  
 
 def scrape_data(url):  
     try:  
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.get(url)
-        
-        soup = bs(driver.page_source, 'html.parser')
-        driver.quit()
+        res = requests.get(url)  
+        res.raise_for_status()  
+        soup = bs(res.text, 'html.parser')  
         
         containers = soup.find_all('div', class_='listings-cards__list-item')  
         data = []  
@@ -65,8 +59,8 @@ def scrape_data(url):
 
         return pd.DataFrame(data)  
     
-    except Exception as e:  
-        st.error(f"Scraping failed: {e}")  
+    except requests.RequestException as e:  
+        st.error(f"Request failed: {e}")  
         return pd.DataFrame()  
 
 # Sidebar configuration  
@@ -101,6 +95,7 @@ if option_selection == "Scrape Data with Beautiful Soup":
     if not scraped_data.empty:  
         st.write(scraped_data)  
         st.success(f"Total des données scrapées: {len(scraped_data)}")   
+
     else:  
         st.warning("Aucune donnée Trouvée ou Scrapée.")  
 
@@ -151,3 +146,6 @@ elif option_selection == "App Evaluation":
     st.header("App Evaluation Form")  
     st.write("Please fill out the form below to provide feedback on the app:")  
     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
+
+
+
