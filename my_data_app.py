@@ -149,4 +149,19 @@ elif option_selection == "Dashboard":
 
                 if 'Condition' in data.columns:  # Corrected column name  
                     st.subheader("Quantité des différents Elements de la colonne (Condition)")  
-                    etat_counts = data['Condition'].
+                    etat_counts = data['Condition'].value_counts()  # Corrected line  
+                    st.bar_chart(etat_counts)  
+
+                if 'Price (F Cfa)' in data.columns:  
+                    st.subheader("Price Distribution")  
+                    st.bar_chart(data['Price (F Cfa)'])  
+
+        else:  
+            st.warning("No Excel files available for dashboard analysis.")  
+    else:  
+        st.warning("The specified folder does not exist.")  
+
+elif option_selection == "App Evaluation":  
+    st.header("App Evaluation Form")  
+    st.write("Please fill out the form below to provide feedback on the app:")  
+    st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
