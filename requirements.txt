@@ -10,12 +10,9 @@ pybase64
 openpyxl
 plotly
 streamlit_option_menu
-
-
-selenium
 webdriver-manager
 beautifulsoup4
-openpyxl
+
 
 
 
