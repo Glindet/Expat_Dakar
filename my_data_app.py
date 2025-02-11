@@ -1,18 +1,17 @@
-import streamlit as st
-import pandas as pd
-
-from streamlit_option_menu import option_menu
-
-
+import streamlit as st  
+import pandas as pd  
 import requests  
 from bs4 import BeautifulSoup as bs  
-
 import os  
 import glob  
 
 def scrape_data(url):  
     try:  
-        res = requests.get(url)  
+        # Setting a User-Agent header to mimic a browser request  
+        headers = {  
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'  
+        }  
+        res = requests.get(url, headers=headers)  
         res.raise_for_status()  
         soup = bs(res.text, 'html.parser')  
         
@@ -77,7 +76,7 @@ url_selection = st.sidebar.selectbox("Choisissez une Catégorie:", list(categori
 
 if url_selection:  
     pages = range(1, 18)  
-    page_selection = st.sidebar.selectbox("Choisissez le numero de la page :", pages)  
+    page_selection = st.sidebar.selectbox("Choisissez le numéro de la page :", pages)  
 
 options = ["Select...", "Scrape Data with Beautiful Soup", "Download Data", "Dashboard", "App Evaluation"]  
 option_selection = st.sidebar.selectbox("Option:", options)  
@@ -97,7 +96,7 @@ if option_selection == "Scrape Data with Beautiful Soup":
         st.success(f"Total des données scrapées: {len(scraped_data)}")   
 
     else:  
-        st.warning("Aucune donnée Trouvée ou Scrapée.")  
+        st.warning("Aucune donnée trouvée ou scrapée.")  
 
 elif option_selection == "Download Data":  
     st.header("Download Data")  
@@ -109,7 +108,7 @@ elif option_selection == "Download Data":
             for file_name in files:  
                 file_path = os.path.join(csv_folder_path, file_name)  
                 with open(file_path, "rb") as file:  
-                    st.download_button(f"Download {file_name}", file, file_name=file_name, mime="text/csv")  
+                    st.download_button(f"Télécharger {file_name}", file, file_name=file_name, mime="text/csv")  
         else:  
             st.warning("No CSV files available for download.")  
     else:  
@@ -129,12 +128,12 @@ elif option_selection == "Dashboard":
                 st.write(data)  
 
                 if 'Etat' in data.columns:  
-                    st.subheader("Quantité des différents Elements de la colonne (Etat)")  
+                    st.subheader("Quantité des différents éléments de la colonne (Etat)")  
                     etat_counts = data['Etat'].value_counts()  
                     st.bar_chart(etat_counts)  
 
                 if 'Price (F Cfa)' in data.columns:  
-                    st.subheader("Price Distribution")  
+                    st.subheader("Répartition des Prix")  
                     st.bar_chart(data['Price (F Cfa)'])  
 
         else:  
@@ -146,6 +145,3 @@ elif option_selection == "App Evaluation":
     st.header("App Evaluation Form")  
     st.write("Please fill out the form below to provide feedback on the app:")  
     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
-
-
-
