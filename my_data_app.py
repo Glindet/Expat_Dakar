@@ -7,10 +7,12 @@ import glob
 
 def scrape_data(url):  
     try:  
+        session = requests.Session()  
         headers = {  
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }  
-        res = requests.get(url, headers=headers)  
+        }
+        session.headers.update(headers)  
+        res = session.get(url)  
         res.raise_for_status()  
         soup = bs(res.text, 'html.parser')  
         
@@ -93,7 +95,6 @@ if option_selection == "Scrape Data with Beautiful Soup":
     if not scraped_data.empty:  
         st.write(scraped_data)  
         st.success(f"Total des données scrapées: {len(scraped_data)}")   
-
     else:  
         st.warning("Aucune donnée Trouvée ou Scrapée.")  
 
