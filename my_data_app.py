@@ -1,30 +1,23 @@
-import streamlit as st
-import pandas as pd
-from streamlit_option_menu import option_menu
+import streamlit as st  
+import pandas as pd  
 import requests  
 from bs4 import BeautifulSoup as bs  
 import os  
-import glob
-import time
-import random
+import glob  
+import time  
 
+# Configuration de l'User-Agent pour simuler un navigateur  
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"  
+
+# Chemins des dossiers  
+CSV_FOLDER_PATH = 'data'  
+CLEAN_DASHBOARD_PATH = 'clean_dashboard'  
+
+# Fonction pour scraper les données  
 def scrape_data(url):  
-    # List of common user-agent strings
-    user_agents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:90.0) Gecko/20100101 Firefox/90.0',
-        'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:54.0) Gecko/20100101 Firefox/54.0',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:78.0) Gecko/20100101 Firefox/78.0',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.97 Safari/537.36'
-    ]
-
-    # Randomly select a User-Agent from the list
-    headers = {
-        'User-Agent': random.choice(user_agents)
-    }
-
     try:  
-        res = requests.get(url, headers=headers)  # Adding headers to request
+        headers = {'User-Agent': USER_AGENT}  
+        res = requests.get(url, headers=headers)  
         res.raise_for_status()  
         soup = bs(res.text, 'html.parser')  
         
@@ -75,7 +68,52 @@ def scrape_data(url):
         st.error(f"Request failed: {e}")  
         return pd.DataFrame()  
 
-# Sidebar configuration  
+# Fonction pour afficher le dashboard  
+def display_dashboard(clean_dashboard_path):  
+    st.header("Data Dashboard")  
+
+    if os.path.exists(clean_dashboard_path):  
+        files = glob.glob(os.path.join(clean_dashboard_path, "*.xlsx"))  
+       
+        if files:  
+            for file_path in files:  
+                st.subheader(f"Dashboard for {os.path.basename(file_path)}")  
+
+                data = pd.read_excel(file_path)  
+                st.write(data)  
+
+                if 'Condition' in data.columns:  
+                    st.subheader("Quantité des différents Elements de la colonne (Condition)")  
+                    condition_counts = data['Condition'].value_counts()  
+                    st.bar_chart(condition_counts)  
+
+                if 'Price (F Cfa)' in data.columns:  
+                    st.subheader("Price Distribution")  
+                    st.bar_chart(data['Price (F Cfa)'])  
+
+        else:  
+            st.warning("No Excel files available for dashboard analysis.")  
+    else:  
+        st.warning("The specified folder does not exist.")  
+
+# Fonction pour télécharger les données  
+def download_data(csv_folder_path):  
+    st.header("Download Data")  
+
+    if os.path.exists(csv_folder_path):  
+        files = [f for f in os.listdir(csv_folder_path) if f.endswith('.csv')]  
+        
+        if files:  
+            for file_name in files:  
+                file_path = os.path.join(csv_folder_path, file_name)  
+                with open(file_path, "rb") as file:  
+                    st.download_button(f"Download {file_name}", file, file_name=file_name, mime="text/csv")  
+        else:  
+            st.warning("No CSV files available for download.")  
+    else:  
+        st.warning("The specified folder does not exist.")  
+
+# Configuration de la sidebar  
 st.sidebar.title("Expat Dakar")  
 
 categories = {  
@@ -94,9 +132,6 @@ if url_selection:
 options = ["Select...", "Scrape Data with Beautiful Soup", "Download Data", "Dashboard", "App Evaluation"]  
 option_selection = st.sidebar.selectbox("Option:", options)  
 
-csv_folder_path = r'data'  
-clean_dashboard_path = r'clean_dashboard'  
-
 # Processing selections  
 if option_selection == "Scrape Data with Beautiful Soup":  
     st.header("Scraping Results")  
@@ -108,51 +143,21 @@ if option_selection == "Scrape Data with Beautiful Soup":
         st.write(scraped_data)  
         st.success(f"Total des données scrapées: {len(scraped_data)}")   
 
+        # Option pour sauvegarder les données en CSV  
+        if st.checkbox("Save data to CSV"):  
+            csv_file_path = os.path.join(CSV_FOLDER_PATH, f"{url_selection.replace(' ', '_')}_page_{page_selection}.csv")  
+            os.makedirs(CSV_FOLDER_PATH, exist_ok=True)  
+            scraped_data.to_csv(csv_file_path, index=False)  
+            st.success(f"Data saved to {csv_file_path}")  
+
     else:  
         st.warning("Aucune donnée Trouvée ou Scrapée.")  
 
 elif option_selection == "Download Data":  
-    st.header("Download Data")  
-
-    if os.path.exists(csv_folder_path):  
-        files = [f for f in os.listdir(csv_folder_path) if f.endswith('.csv')]  
-        
-        if files:  
-            for file_name in files:  
-                file_path = os.path.join(csv_folder_path, file_name)  
-                with open(file_path, "rb") as file:  
-                    st.download_button(f"Download {file_name}", file, file_name=file_name, mime="text/csv")  
-        else:  
-            st.warning("No CSV files available for download.")  
-    else:  
-        st.warning("The specified folder does not exist.")  
+    download_data(CSV_FOLDER_PATH)  
 
 elif option_selection == "Dashboard":  
-    st.header("Data Dashboard")  
-
-    if os.path.exists(clean_dashboard_path):  
-        files = glob.glob(os.path.join(clean_dashboard_path, "*.xlsx"))  
-       
-        if files:  
-            for file_path in files:  
-                st.subheader(f"Dashboard for {os.path.basename(file_path)}")  
-
-                data = pd.read_excel(file_path)  
-                st.write(data)  
-
-                if 'Etat' in data.columns:  
-                    st.subheader("Quantité des différents Elements de la colonne (Etat)")  
-                    etat_counts = data['Etat'].value_counts()  
-                    st.bar_chart(etat_counts)  
-
-                if 'Price (F Cfa)' in data.columns:  
-                    st.subheader("Price Distribution")  
-                    st.bar_chart(data['Price (F Cfa)'])  
-
-        else:  
-            st.warning("No Excel files available for dashboard analysis.")  
-    else:  
-        st.warning("The specified folder does not exist.")  
+    display_dashboard(CLEAN_DASHBOARD_PATH)  
 
 elif option_selection == "App Evaluation":  
     st.header("App Evaluation Form")  
