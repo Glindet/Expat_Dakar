@@ -1,18 +1,16 @@
 import streamlit as st
 import pandas as pd
-
-from streamlit_option_menu import option_menu
-
-
 import requests  
 from bs4 import BeautifulSoup as bs  
-
 import os  
 import glob  
 
 def scrape_data(url):  
     try:  
-        res = requests.get(url)  
+        headers = {  
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }  
+        res = requests.get(url, headers=headers)  
         res.raise_for_status()  
         soup = bs(res.text, 'html.parser')  
         
@@ -146,6 +144,3 @@ elif option_selection == "App Evaluation":
     st.header("App Evaluation Form")  
     st.write("Please fill out the form below to provide feedback on the app:")  
     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
-
-
-
