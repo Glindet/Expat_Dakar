@@ -1,20 +1,26 @@
 import streamlit as st
 import pandas as pd
-import requests  
-from bs4 import BeautifulSoup as bs  
 import os  
 import glob  
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+from bs4 import BeautifulSoup as bs  
 
 def scrape_data(url):  
     try:  
-        session = requests.Session()  
-        headers = {  
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        session.headers.update(headers)  
-        res = session.get(url)  
-        res.raise_for_status()  
-        soup = bs(res.text, 'html.parser')  
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
+        driver.get(url)
+        
+        soup = bs(driver.page_source, 'html.parser')
+        driver.quit()
         
         containers = soup.find_all('div', class_='listings-cards__list-item')  
         data = []  
@@ -59,8 +65,8 @@ def scrape_data(url):
 
         return pd.DataFrame(data)  
     
-    except requests.RequestException as e:  
-        st.error(f"Request failed: {e}")  
+    except Exception as e:  
+        st.error(f"Scraping failed: {e}")  
         return pd.DataFrame()  
 
 # Sidebar configuration  
