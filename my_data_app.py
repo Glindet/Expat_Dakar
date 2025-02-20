@@ -166,39 +166,33 @@
 #     st.write("Please fill out the form below to provide feedback on the app:")  
 #     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
 
-import streamlit as st  
-import pandas as pd  
-from selenium import webdriver  
-from selenium.webdriver.chrome.service import Service as ChromeService  
-from webdriver_manager.chrome import ChromeDriverManager  
-from selenium.webdriver.common.by import By  
-import time  
+import streamlit as st
+import pandas as pd
+
+from streamlit_option_menu import option_menu
+
+
+import requests  
+from bs4 import BeautifulSoup as bs  
+
 import os  
 import glob  
 
 def scrape_data(url):  
     try:  
-        # Setup Chrome Driver  
-        options = webdriver.ChromeOptions()  
-        options.add_argument('--headless')  # Uncomment if you want to run without a GUI  
-        options.add_argument('--no-sandbox')  # Bypass OS security model  
-        options.add_argument('--disable-dev-shm-usage')  # Overcome limited resource problems  
-
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)  
-        driver.get(url)  
-
-        # Allow time for the page to load completely  
-        time.sleep(5)  # Adjust sleep time based on your connection speed  
-
-        containers = driver.find_elements(By.CLASS_NAME, 'listings-cards__list-item')  
+        res = requests.get(url)  
+        res.raise_for_status()  
+        soup = bs(res.text, 'html.parser')  
+        
+        containers = soup.find_all('div', class_='listings-cards__list-item')  
         data = []  
 
         for container in containers:  
             try:  
-                detail_elem = container.find_element(By.CSS_SELECTOR, '.listing-card__header__title')  
-                prix_elem = container.find_element(By.CSS_SELECTOR, '.listing-card__price__value')  
-                adresse_elem = container.find_element(By.CSS_SELECTOR, '.listing-card__header__location')  
-                image_elem = container.find_element(By.CSS_SELECTOR, '.listing-card__image__inner img')  
+                detail_elem = container.find('div', class_='listing-card__header__title')  
+                prix_elem = container.find('span', class_='listing-card__price__value')  
+                adresse_elem = container.find('div', class_='listing-card__header__location')  
+                image_elem = container.find('div', class_='listing-card__image__inner')  
 
                 condition_classes = [  
                     'listing-card__header__tags__item--condition_used',  
@@ -209,17 +203,15 @@ def scrape_data(url):
 
                 etat = "Pas Disponible"  
                 for cls in condition_classes:  
-                    try:  
-                        etat_elem = container.find_element(By.CLASS_NAME, cls)  
+                    etat_elem = container.find('span', class_=cls)  
+                    if etat_elem:  
                         etat = etat_elem.text.strip()  
                         break  
-                    except:  
-                        continue  
                 
                 detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"  
-                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem else 0.0  
+                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
                 adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"  
-                image_lien = image_elem.get_attribute('src') if image_elem else "Pas Disponible"  
+                image_lien = image_elem.img['src'] if image_elem and image_elem.img else "Pas Disponible"  
 
                 dic = {  
                     'Details': detail,  
@@ -229,14 +221,14 @@ def scrape_data(url):
                     'Image Link': image_lien  
                 }  
                 data.append(dic)  
+
             except Exception as inner_e:  
                 st.error(f"Error processing item: {inner_e}")  
 
-        driver.quit()  
         return pd.DataFrame(data)  
-
-    except Exception as e:  
-        st.error(f"Error: {e}")  
+    
+    except requests.RequestException as e:  
+        st.error(f"Request failed: {e}")  
         return pd.DataFrame()  
 
 # Sidebar configuration  
@@ -253,16 +245,16 @@ url_selection = st.sidebar.selectbox("Choisissez une Catégorie:", list(categori
 
 if url_selection:  
     pages = range(1, 18)  
-    page_selection = st.sidebar.selectbox("Choisissez le numéro de la page :", pages)  
+    page_selection = st.sidebar.selectbox("Choisissez le numero de la page :", pages)  
 
-options = ["Select...", "Scrape Data with Selenium", "Download Data", "Dashboard", "App Evaluation"]  
-option_selection = st.sidebar.selectbox("Options:", options)  
+options = ["Select...", "Scrape Data with Beautiful Soup", "Download Data", "Dashboard", "App Evaluation"]  
+option_selection = st.sidebar.selectbox("Option:", options)  
 
 csv_folder_path = r'data'  
 clean_dashboard_path = r'clean_dashboard'  
 
 # Processing selections  
-if option_selection == "Scrape Data with Selenium":  
+if option_selection == "Scrape Data with Beautiful Soup":  
     st.header("Scraping Results")  
     selected_url = f"{categories[url_selection]}?page={page_selection}"  
     with st.spinner('Scraping data...'):  
@@ -271,13 +263,16 @@ if option_selection == "Scrape Data with Selenium":
     if not scraped_data.empty:  
         st.write(scraped_data)  
         st.success(f"Total des données scrapées: {len(scraped_data)}")   
+
     else:  
         st.warning("Aucune donnée Trouvée ou Scrapée.")  
 
 elif option_selection == "Download Data":  
     st.header("Download Data")  
+
     if os.path.exists(csv_folder_path):  
         files = [f for f in os.listdir(csv_folder_path) if f.endswith('.csv')]  
+        
         if files:  
             for file_name in files:  
                 file_path = os.path.join(csv_folder_path, file_name)  
@@ -290,20 +285,26 @@ elif option_selection == "Download Data":
 
 elif option_selection == "Dashboard":  
     st.header("Data Dashboard")  
+
     if os.path.exists(clean_dashboard_path):  
         files = glob.glob(os.path.join(clean_dashboard_path, "*.xlsx"))  
+       
         if files:  
             for file_path in files:  
                 st.subheader(f"Dashboard for {os.path.basename(file_path)}")  
+
                 data = pd.read_excel(file_path)  
                 st.write(data)  
+
                 if 'Etat' in data.columns:  
                     st.subheader("Quantité des différents Elements de la colonne (Etat)")  
                     etat_counts = data['Etat'].value_counts()  
                     st.bar_chart(etat_counts)  
+
                 if 'Price (F Cfa)' in data.columns:  
                     st.subheader("Price Distribution")  
                     st.bar_chart(data['Price (F Cfa)'])  
+
         else:  
             st.warning("No Excel files available for dashboard analysis.")  
     else:  
@@ -313,6 +314,10 @@ elif option_selection == "App Evaluation":
     st.header("App Evaluation Form")  
     st.write("Please fill out the form below to provide feedback on the app:")  
     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
+
+
+
+
 
 
 
