@@ -167,16 +167,19 @@
 #     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
 
 
+import streamlit as st  
+import pandas as pd  
+from streamlit_option_menu import option_menu  
 import requests  
 from bs4 import BeautifulSoup as bs  
-import pandas as pd  
-import streamlit as st  
+import os  
+import glob  
+import time  # For adding delay between requests  
 
 def scrape_data(url):  
     try:  
-        # Use a session to maintain state  
+        # Use a session to maintain state and set a User-Agent header  
         with requests.Session() as session:  
-            # Set a User-Agent header to mimic a browser  
             session.headers.update({  
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'  
             })  
@@ -184,7 +187,7 @@ def scrape_data(url):
             res = session.get(url)  
             res.raise_for_status()  # Check if the request was successful  
             soup = bs(res.text, 'html.parser')  
-
+            
             containers = soup.find_all('div', class_='listings-cards__list-item')  
             data = []  
 
@@ -227,11 +230,93 @@ def scrape_data(url):
                     st.error(f"Error processing item: {inner_e}")  
 
             return pd.DataFrame(data)  
-
+    
     except requests.RequestException as e:  
         st.error(f"Request failed: {e}")  
-        return pd.DataFrame()
+        return pd.DataFrame()  
 
+# Sidebar configuration  
+st.sidebar.title("Expat Dakar")  
 
+categories = {  
+    "Refrigerateurs Congélateurs": "https://www.expat-dakar.com/refrigerateurs-congelateurs",  
+    "Climatisation": "https://www.expat-dakar.com/climatisation",  
+    "Cuisinières et Fours": "https://www.expat-dakar.com/machines-a-laver",  
+    "Machines à Laver": "https://www.expat-dakar.com/machines-a-laver",  
+}  
+
+url_selection = st.sidebar.selectbox("Choisissez une Catégorie:", list(categories.keys()))  
+
+if url_selection:  
+    pages = range(1, 18)  
+    page_selection = st.sidebar.selectbox("Choisissez le numéro de la page :", pages)  
+
+options = ["Select...", "Scrape Data with Beautiful Soup", "Download Data", "Dashboard", "App Evaluation"]  
+option_selection = st.sidebar.selectbox("Option:", options)  
+
+csv_folder_path = r'data'  
+clean_dashboard_path = r'clean_dashboard'  
+
+# Processing selections  
+if option_selection == "Scrape Data with Beautiful Soup":  
+    st.header("Scraping Results")  
+    selected_url = f"{categories[url_selection]}?page={page_selection}"  
+    with st.spinner('Scraping data...'):  
+        scraped_data = scrape_data(selected_url)  
+
+    if not scraped_data.empty:  
+        st.write(scraped_data)  
+        st.success(f"Total des données scrapées: {len(scraped_data)}")   
+
+    else:  
+        st.warning("Aucune donnée Trouvée ou Scrapée.")  
+
+elif option_selection == "Download Data":  
+    st.header("Download Data")  
+
+    if os.path.exists(csv_folder_path):  
+        files = [f for f in os.listdir(csv_folder_path) if f.endswith('.csv')]  
+        
+        if files:  
+            for file_name in files:  
+                file_path = os.path.join(csv_folder_path, file_name)  
+                with open(file_path, "rb") as file:  
+                    st.download_button(f"Download {file_name}", file, file_name=file_name, mime="text/csv")  
+        else:  
+            st.warning("No CSV files available for download.")  
+    else:  
+        st.warning("The specified folder does not exist.")  
+
+elif option_selection == "Dashboard":  
+    st.header("Data Dashboard")  
+
+    if os.path.exists(clean_dashboard_path):  
+        files = glob.glob(os.path.join(clean_dashboard_path, "*.xlsx"))  
+       
+        if files:  
+            for file_path in files:  
+                st.subheader(f"Dashboard for {os.path.basename(file_path)}")  
+
+                data = pd.read_excel(file_path)  
+                st.write(data)  
+
+                if 'Condition' in data.columns:  
+                    st.subheader("Quantité des différents Éléments de la colonne (Condition)")  
+                    condition_counts = data['Condition'].value_counts()  
+                    st.bar_chart(condition_counts)  
+
+                if 'Price (F Cfa)' in data.columns:  
+                    st.subheader("Price Distribution")  
+                    st.bar_chart(data['Price (F Cfa)'])  
+
+        else:  
+            st.warning("No Excel files available for dashboard analysis.")  
+    else:  
+        st.warning("The specified folder does not exist.")  
+
+elif option_selection == "App Evaluation":  
+    st.header("App Evaluation Form")  
+    st.write("Please fill out the form below to provide feedback on the app:")  
+    st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
 
 
