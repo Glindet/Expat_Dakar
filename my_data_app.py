@@ -180,11 +180,14 @@ def scrape_data(url):
     try:  
         # Setup Chrome Driver  
         options = webdriver.ChromeOptions()  
-        options.add_argument('--headless')  # Run in headless mode  
+        options.add_argument('--headless')  # Uncomment if you want to run without a GUI  
+        options.add_argument('--no-sandbox')  # Bypass OS security model  
+        options.add_argument('--disable-dev-shm-usage')  # Overcome limited resource problems  
+
         driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)  
         driver.get(url)  
 
-        # Allow time for page to load  
+        # Allow time for the page to load completely  
         time.sleep(5)  # Adjust sleep time based on your connection speed  
 
         containers = driver.find_elements(By.CLASS_NAME, 'listings-cards__list-item')  
@@ -253,7 +256,7 @@ if url_selection:
     page_selection = st.sidebar.selectbox("Choisissez le numéro de la page :", pages)  
 
 options = ["Select...", "Scrape Data with Selenium", "Download Data", "Dashboard", "App Evaluation"]  
-option_selection = st.sidebar.selectbox("Option:", options)  
+option_selection = st.sidebar.selectbox("Options:", options)  
 
 csv_folder_path = r'data'  
 clean_dashboard_path = r'clean_dashboard'  
