@@ -166,70 +166,66 @@
 #     st.write("Please fill out the form below to provide feedback on the app:")  
 #     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
 
+import streamlit as st
+import pandas as pd
 
-import streamlit as st  
-import pandas as pd  
-from streamlit_option_menu import option_menu  
+from streamlit_option_menu import option_menu
+
+
 import requests  
 from bs4 import BeautifulSoup as bs  
+
 import os  
 import glob  
-import time  # For adding delay between requests  
 
 def scrape_data(url):  
     try:  
-        # Use a session to maintain state and set a User-Agent header  
-        with requests.Session() as session:  
-            session.headers.update({  
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'  
-            })  
-            
-            res = session.get(url)  
-            res.raise_for_status()  # Check if the request was successful  
-            soup = bs(res.text, 'html.parser')  
-            
-            containers = soup.find_all('div', class_='listings-cards__list-item')  
-            data = []  
+        res = requests.get(url)  
+        res.raise_for_status()  
+        soup = bs(res.text, 'html.parser')  
+        
+        containers = soup.find_all('div', class_='listings-cards__list-item')  
+        data = []  
 
-            for container in containers:  
-                try:  
-                    detail_elem = container.find('div', class_='listing-card__header__title')  
-                    prix_elem = container.find('span', class_='listing-card__price__value')  
-                    adresse_elem = container.find('div', class_='listing-card__header__location')  
-                    image_elem = container.find('div', class_='listing-card__image__inner')  
+        for container in containers:  
+            try:  
+                detail_elem = container.find('div', class_='listing-card__header__title')  
+                prix_elem = container.find('span', class_='listing-card__price__value')  
+                adresse_elem = container.find('div', class_='listing-card__header__location')  
+                image_elem = container.find('div', class_='listing-card__image__inner')  
 
-                    condition_classes = [  
-                        'listing-card__header__tags__item--condition_used',  
-                        'listing-card__header__tags__item--condition_new',  
-                        'listing-card__header__tags__item--condition_refurbished',  
-                        'listing-card__header__tags__item--condition_used-abroad'  
-                    ]  
+                condition_classes = [  
+                    'listing-card__header__tags__item--condition_used',  
+                    'listing-card__header__tags__item--condition_new',  
+                    'listing-card__header__tags__item--condition_refurbished',  
+                    'listing-card__header__tags__item--condition_used-abroad'  
+                ]  
 
-                    etat = "Pas Disponible"  
-                    for cls in condition_classes:  
-                        etat_elem = container.find('span', class_=cls)  
-                        if etat_elem:  
-                            etat = etat_elem.text.strip()  
-                            break  
-                    
-                    detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"  
-                    prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
-                    adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"  
-                    image_lien = image_elem.img['src'] if image_elem and image_elem.img else "Pas Disponible"  
+                etat = "Pas Disponible"  
+                for cls in condition_classes:  
+                    etat_elem = container.find('span', class_=cls)  
+                    if etat_elem:  
+                        etat = etat_elem.text.strip()  
+                        break  
+                
+                detail = detail_elem.text.strip() if detail_elem else "Pas Disponible"  
+                prix = float(prix_elem.text.strip().replace('\u202f', '').replace(' F Cfa', '').replace(' ', '')) if prix_elem and prix_elem.text.strip() else 0.0  
+                adresse = adresse_elem.text.strip().replace(',\n', ' -').strip() if adresse_elem else "Pas Disponible"  
+                image_lien = image_elem.img['src'] if image_elem and image_elem.img else "Pas Disponible"  
 
-                    dic = {  
-                        'Details': detail,  
-                        'Condition': etat,  
-                        'Price (F Cfa)': prix,  
-                        'Address': adresse,  
-                        'Image Link': image_lien  
-                    }  
-                    data.append(dic)  
+                dic = {  
+                    'Details': detail,  
+                    'Condition': etat,  
+                    'Price (F Cfa)': prix,  
+                    'Address': adresse,  
+                    'Image Link': image_lien  
+                }  
+                data.append(dic)  
 
-                except Exception as inner_e:  
-                    st.error(f"Error processing item: {inner_e}")  
+            except Exception as inner_e:  
+                st.error(f"Error processing item: {inner_e}")  
 
-            return pd.DataFrame(data)  
+        return pd.DataFrame(data)  
     
     except requests.RequestException as e:  
         st.error(f"Request failed: {e}")  
@@ -241,7 +237,7 @@ st.sidebar.title("Expat Dakar")
 categories = {  
     "Refrigerateurs Congélateurs": "https://www.expat-dakar.com/refrigerateurs-congelateurs",  
     "Climatisation": "https://www.expat-dakar.com/climatisation",  
-    "Cuisinières et Fours": "https://www.expat-dakar.com/machines-a-laver",  
+    "Cuisinières et Fours": "https://www.expat-dakar.com/cuisinieres-fours",  
     "Machines à Laver": "https://www.expat-dakar.com/machines-a-laver",  
 }  
 
@@ -249,7 +245,7 @@ url_selection = st.sidebar.selectbox("Choisissez une Catégorie:", list(categori
 
 if url_selection:  
     pages = range(1, 18)  
-    page_selection = st.sidebar.selectbox("Choisissez le numéro de la page :", pages)  
+    page_selection = st.sidebar.selectbox("Choisissez le numero de la page :", pages)  
 
 options = ["Select...", "Scrape Data with Beautiful Soup", "Download Data", "Dashboard", "App Evaluation"]  
 option_selection = st.sidebar.selectbox("Option:", options)  
@@ -300,10 +296,10 @@ elif option_selection == "Dashboard":
                 data = pd.read_excel(file_path)  
                 st.write(data)  
 
-                if 'Condition' in data.columns:  
-                    st.subheader("Quantité des différents Éléments de la colonne (Condition)")  
-                    condition_counts = data['Condition'].value_counts()  
-                    st.bar_chart(condition_counts)  
+                if 'Etat' in data.columns:  
+                    st.subheader("Quantité des différents Elements de la colonne (Etat)")  
+                    etat_counts = data['Etat'].value_counts()  
+                    st.bar_chart(etat_counts)  
 
                 if 'Price (F Cfa)' in data.columns:  
                     st.subheader("Price Distribution")  
@@ -318,5 +314,9 @@ elif option_selection == "App Evaluation":
     st.header("App Evaluation Form")  
     st.write("Please fill out the form below to provide feedback on the app:")  
     st.components.v1.iframe("https://ee.kobotoolbox.org/i/CHR2ME9Y", width=800, height=600)
+
+
+
+
 
 
